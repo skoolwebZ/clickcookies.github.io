@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cookie Clicker</title>
+<style>
+body {
+    margin: 0;
+    background: #f0e4d7;
+    font-family: Arial, sans-serif;
+}
+#top-bar {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background: #d1bfa7;
+    font-weight: bold;
+    font-size: 18px;
+}
+#game {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 20px;
+}
+#cookie-container {
+    position: relative;
+}
+#cookie {
+    width: 200px;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+#cookie:active {
+    transform: scale(0.95);
+}
+.floating {
+    position: absolute;
+    pointer-events: none;
+    font-weight: bold;
+    color: #ff9900;
+    animation: floatUp 1s forwards;
+}
+@keyframes floatUp {
+    0% { opacity:1; transform: translateY(0); }
+    100% { opacity:0; transform: translateY(-50px); }
+}
+#upgrades {
+    width: 300px;
+    background: #fff8dc;
+    padding: 10px;
+    border-radius: 10px;
+    max-height: 600px;
+    overflow-y: auto;
+}
+.upgrade {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    padding: 5px;
+    border-bottom: 1px solid #ccc;
+}
+.upgrade button {
+    cursor: pointer;
+}
+#goldenCookie {
+    width: 80px;
+    position: absolute;
+    cursor: pointer;
+    display: none;
+}
+#bottom-panel {
+    background: #fff8dc;
+    padding: 10px 20px;
+    margin-top: 20px;
+}
+</style>
+</head>
+<body>
+
+<div id="top-bar">
+    <div>Cookies: <span id="cookies">0</span></div>
+    <div>CPS: <span id="cps">0</span></div>
+    <div>Clicks: <span id="totalClicks">0</span></div>
+</div>
+
+<div id="game">
+    <div id="cookie-container">
+        <img src="https://cdn.pixabay.com/photo/2017/01/20/00/30/cookie-1994884_1280.png" id="cookie">
+        <img src="https://cdn.pixabay.com/photo/2013/07/13/10/20/gold-157186_1280.png" id="goldenCookie">
+    </div>
+    <div id="upgrades"></div>
+</div>
+
+<div id="bottom-panel">
+    <h3>Stats</h3>
+    <p>Total Cookies Earned: <span id="totalCookies">0</span></p>
+    <p>Total Upgrades Purchased: <span id="totalUpgrades">0</span></p>
+    <h3>Achievements</h3>
+    <ul id="achievementsList"></ul>
+</div>
+
+<script>
+// Game state
+let cookies = 0;
+let totalCookies = 0;
+let totalClicks = 0;
+let cps = 0;
+let totalUpgrades = 0;
+
+// Upgrades
+let upgrades = [
+    { name: "Cursor", cost: 15, count: 0, cps: 0.1 },
+    { name: "Grandma", cost: 100, count: 0, cps: 1 },
+    { name: "Farm", cost: 500, count: 0, cps: 5 },
+    { name: "Mine", cost: 2000, count: 0, cps: 10 },
+    { name: "Factory", cost: 10000, count: 0, cps: 40 },
+    { name: "Bank", cost: 50000, count: 0, cps: 100 },
+    { name: "Temple", cost: 100000, count: 0, cps: 400 },
+    { name: "Wizard Tower", cost: 500000, count: 0, cps: 1000 },
+    { name: "Shipment", cost: 1000000, count: 0, cps: 4000 },
+    { name: "Alchemy Lab", cost: 5000000, count: 0, cps: 10000 },
+    { name: "Portal", cost: 10000000, count: 0, cps: 40000 },
+    { name: "Time Machine", cost: 50000000, count: 0, cps: 100000 }
+];
+
+// Achievements
+let achievements = [
+    { name: "First Click", condition: () => totalClicks >= 1, earned: false },
+    { name: "Hundred Cookies", condition: () => totalCookies >= 100, earned: false },
+    { name: "Cookie Hoarder", condition: () => totalCookies >= 1000, earned: false },
+    { name: "Grandma Army", condition: () => upgrades[1].count >= 10, earned: false },
+    { name: "Farm Frenzy", condition: () => upgrades[2].count >= 10, earned: false }
+];
+
+// DOM elements
+const cookiesDisplay = document.getElementById('cookies');
+const cpsDisplay = document.getElementById('cps');
+const cookieBtn = document.getElementById('cookie');
+const upgradesDiv = document.getElementById('upgrades');
+const cookieContainer = document.getElementById('cookie-container');
+const goldenCookie = document.getElementById('goldenCookie');
+const totalClicksDisplay = document.getElementById('totalClicks');
+const totalCookiesDisplay = document.getElementById('totalCookies');
+const totalUpgradesDisplay = document.getElementById('totalUpgrades');
+const achievementsList = document.getElementById('achievementsList');
+
+// Functions
+function updateCPS() {
+    cps = upgrades.reduce((a,b)=>a+b.count*b.cps,0);
+}
+
+function updateDisplay() {
+    cookiesDisplay.textContent = Math.floor(cookies);
+    cpsDisplay.textContent = cps.toFixed(1);
+    totalClicksDisplay.textContent = totalClicks;
+    totalCookiesDisplay.textContent = Math.floor(totalCookies);
+    totalUpgradesDisplay.textContent = totalUpgrades;
+    updateAchievements();
+    initUpgrades();
+}
+
+function initUpgrades() {
+    upgradesDiv.innerHTML = '';
+    upgrades.forEach((u,i)=>{
+        const div = document.createElement('div');
+        div.classList.add('upgrade');
+        div.innerHTML = `<span>${u.name} (x${u.count})</span>
+                         <span>${u.cost} <button onclick="buyUpgrade(${i})">Buy</button></span>`;
+        upgradesDiv.appendChild(div);
+    });
+}
+
+function buyUpgrade(i) {
+    if(cookies >= upgrades[i].cost){
+        cookies -= upgrades[i].cost;
+        upgrades[i].count++;
+        upgrades[i].cost = Math.floor(upgrades[i].cost * 1.15);
+        totalUpgrades++;
+        updateCPS();
+        updateDisplay();
+        saveGame();
+    }
+}
+
+cookieBtn.addEventListener('click', e => {
+    cookies++;
+    totalCookies++;
+    totalClicks++;
+    const float = document.createElement('div');
+    float.classList.add('floating');
+    float.style.left = (Math.random()*50+75)+'px';
+    float.style.top = (Math.random()*50+75)+'px';
+    float.textContent = '+1';
+    cookieContainer.appendChild(float);
+    setTimeout(()=>float.remove(),1000);
+    updateDisplay();
+});
+
+function updateAchievements() {
+    achievementsList.innerHTML = '';
+    achievements.forEach(a => {
+        if(!a.earned && a.condition()) a.earned = true;
+        if(a.earned){
+            const li = document.createElement('li');
+            li.textContent = a.name;
+            achievementsList.appendChild(li);
+        }
+    });
+}
+
+// Golden cookie
+function spawnGoldenCookie() {
+    goldenCookie.style.left = Math.random()*(window.innerWidth-80)+'px';
+    goldenCookie.style.top = Math.random()*(window.innerHeight-80)+'px';
+    goldenCookie.style.display = 'block';
+    setTimeout(()=>goldenCookie.style.display='none',10000);
+}
+goldenCookie.addEventListener('click', () => {
+    let bonus = Math.floor(cookies*0.5 + 50);
+    cookies += bonus;
+    totalCookies += bonus;
+    goldenCookie.style.display='none';
+    updateDisplay();
+});
+setInterval(()=>{if(Math.random()<0.01) spawnGoldenCookie()},1000);
+
+// Auto CPS
+setInterval(()=>{
+    cookies += cps/10;
+    totalCookies += cps/10;
+    updateDisplay();
+    saveGame();
+},100);
+
+// Save/load
+function saveGame() {
+    localStorage.setItem('cookieClickerUltimate', JSON.stringify({ cookies, totalCookies, totalClicks, upgrades, achievements, totalUpgrades }));
+}
+function loadGame() {
+    const saved = JSON.parse(localStorage.getItem('cookieClickerUltimate'));
+    if(saved){
+        cookies = saved.cookies;
+        totalCookies = saved.totalCookies;
+        totalClicks = saved.totalClicks;
+        upgrades = saved.upgrades;
+        achievements = saved.achievements;
+        totalUpgrades = saved.totalUpgrades;
+        updateCPS();
+    }
+}
+loadGame();
+updateDisplay();
+</script>
+
+</body>
+</html>
